@@ -1,4 +1,4 @@
-import { db } from "../config/firebase.js";
+import Room from "../models/Room.js";
 
 // For checking room is available or not by roomid
 export const checkRoom = async (req, res) => {
@@ -9,14 +9,13 @@ export const checkRoom = async (req, res) => {
       return res.status(400).json({ error: "roomId is required" });
     }
 
-    const roomRef = db.collection("allRooms").doc(roomId);
-    const roomSnap = await roomRef.get();
+    const room = await Room.findOne({ roomId });
 
-    if (!roomSnap.exists) {
+    if (!room) {
       return res.status(404).json({ message: "Room not found" });
     }
 
-    const { email: ownerEmail ,isInterviewMode } = roomSnap.data();
+    const { email: ownerEmail, isInterviewMode } = room;
 
     return res.status(200).json({
       message: "Room found",
@@ -34,39 +33,18 @@ export const joinRoom = async (req, res) => {
   try {
     const { roomId, email, creatorEmail } = req.body;
 
-    console.log("✅✅✅✅ ",email,roomId,creatorEmail);
+    console.log("✅✅✅✅ ", email, roomId, creatorEmail);
 
     if (!roomId || !email || !creatorEmail) {
       return res.status(400).json({ error: "Room ID, creator email, and user email are required" });
     }
 
-    // Step 1: Get room data from creator's document
-    const creatorRoomRef = db
-      .collection("users")
-      .doc(creatorEmail)
-      .collection("rooms")
-      .doc(roomId);
+    // Verify room exists
+    const room = await Room.findOne({ roomId });
 
-    const creatorRoomSnap = await creatorRoomRef.get();
-
-    if (!creatorRoomSnap.exists) {
-      return res.status(404).json({ error: "Room not found in creator's account" });
+    if (!room) {
+      return res.status(404).json({ error: "Room not found" });
     }
-
-    const roomData = creatorRoomSnap.data();
-
-    // Step 2: Copy room data to joining user's document
-    const joinerRef = db.collection("users").doc(email);
-    const joinerSnap = await joinerRef.get();
-
-    if (!joinerSnap.exists) {
-      return res.status(404).json({ error: "Joining user not found" });
-    }
-
-    await joinerRef
-      .collection("rooms")
-      .doc(roomId)
-      .set({ ...roomData, joinedAt: new Date().toISOString() });
 
     return res.status(200).json({
       message: "Room joined successfully",

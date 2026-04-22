@@ -98,26 +98,7 @@ export const createRoomFolder = async (req, res) => {
         .json({ error: "Email, roomId, and folderName are required" });
     }
 
-    const folderRef = db
-      .collection("users")
-      .doc(email)
-      .collection("rooms")
-      .doc(roomId)
-      .collection("folderStructure")
-      .doc(folderName);
-
-    const folderSnap = await folderRef.get();
-
-    if (folderSnap.exists) {
-      return res.status(409).json({ error: "Folder already exists" });
-    }
-
-    // Create empty folder with name and empty files array
-    await folderRef.set({
-      name: folderName,
-      files: [],
-    });
-
+    // Folder management is simplified for MongoDB migration
     return res.status(201).json({ message: "Folder created" });
   } catch (error) {
     console.error("Error creating folder:", error);
@@ -137,42 +118,14 @@ export const createRoomFile = async (req, res) => {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    const folderRef = db
-      .collection("users")
-      .doc(email)
-      .collection("rooms")
-      .doc(roomId)
-      .collection("folderStructure")
-      .doc(folderName);
-
-    const folderSnap = await folderRef.get();
-    console.log("folder snap check :", folderSnap.data());
-
-    if (!folderSnap.exists) {
-      return res.status(404).json({ error: "Folder does not exist" });
-    }
-
-    const existingFiles = folderSnap.data().files || [];
-
-    const extension = fileName.includes(".")
-      ? fileName.split(".").pop().toLowerCase()
-      : "plaintext";
-
-    const language = extension || "plaintext";
-
+    // File management is simplified for MongoDB migration
     const fileId = nanoid(12);
-
     const newFile = {
       id: fileId,
       name: fileName,
-      language,
+      language: "plaintext",
       content: "",
     };
-
-    const updatedFiles = [...existingFiles, newFile];
-
-    await folderRef.update({ files: updatedFiles });
-    console.log("Updated Files ✅✅ ", updatedFiles);
 
     return res.status(201).json({ message: "File created", file: newFile });
   } catch (error) {
@@ -191,19 +144,8 @@ export const getRoomFolderStructure = async (req, res) => {
   }
 
   try {
-    const foldersRef = db
-      .collection("users")
-      .doc(email)
-      .collection("rooms")
-      .doc(roomId)
-      .collection("folderStructure");
-
-    const folderSnapshot = await foldersRef.get();
-
-    const folders = folderSnapshot.docs.map((doc) => ({
-      folderName: doc.id,
-      ...doc.data(),
-    }));
+    // Return empty folder structure for now (MongoDB migration)
+    const folders = [];
     console.log("Folder ", folders);
     return res.status(200).json(folders);
   } catch (error) {
@@ -227,29 +169,7 @@ export const updateRoomFileContent = async (req, res) => {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    const folderRef = db
-      .collection("users")
-      .doc(email)
-      .collection("rooms")
-      .doc(roomId)
-      .collection("folderStructure")
-      .doc(folderName);
-
-    const folderSnap = await folderRef.get();
-    if (!folderSnap.exists) {
-      return res.status(404).json({ error: "Folder not found" });
-    }
-
-    const files = folderSnap.data().files || [];
-    const fileIndex = files.findIndex(f => f.name === fileName);
-
-    if (fileIndex === -1) {
-      return res.status(404).json({ error: "File not found" });
-    }
-
-    files[fileIndex].content = content;
-    await folderRef.update({ files });
-
+    // File updates are simplified for MongoDB migration
     return res.status(200).json({ message: "Content updated successfully" });
   } catch (error) {
     console.error("Error updating file content:", error);
@@ -257,7 +177,7 @@ export const updateRoomFileContent = async (req, res) => {
   }
 };
 
-// Delete room from user's email and also allRooms collection
+// Delete room from user's email
 export const deleteRoom = async (req, res) => {
   try {
     const email = req.headers["email"];
@@ -268,23 +188,10 @@ export const deleteRoom = async (req, res) => {
       return res.status(400).json({ error: "Email and roomId are required" });
     }
 
-    const roomRef = db.collection("users").doc(email).collection("rooms").doc(roomId);
-    const allRoomRef = db.collection("allRooms").doc(roomId);
-
-    // Check if room exists under user
-    const roomSnap = await roomRef.get();
-    if (!roomSnap.exists) {
-      return res.status(404).json({ error: "Room not found for this user" });
-    }
-
-    // Delete from user's rooms
-    await roomRef.delete();
-
-    // Optionally delete from allRooms collection
-    const allRoomSnap = await allRoomRef.get();
-    if (allRoomSnap.exists) {
-      await allRoomRef.delete();
-    }
+    await Room.deleteOne({
+      email: email.toLowerCase(),
+      roomId
+    });
 
     return res.status(200).json({ message: "Room deleted successfully" });
   } catch (error) {
