@@ -7,10 +7,13 @@ import VideoCallSection from "../video_call/VideoCallSection";
 import { SocketProvider } from "../../context/SocketProvider";
 import { CollabEditorPane } from "./CollabEditorPane";
 import { useYjsProvider } from "../../hooks/useYjsProvider";
-import CodeExecutionResult from "./CodeExecutionResult";
 import HtmlPreview from "./HtmlPreview";
 import { runCode } from "../../services/codeExec";
 import axios from "axios";
+import EmotionMonitor from "../EmotionMonitor";
+import TerminalComponent from "../terminal/TerminalComponent";
+import EditorFooterBar from "./EditorFooterBar";
+import useSyncedToggleState from "../../hooks/useSyncedToggleState";
 
 export default function CollabEditorLayout({ roomId, isInterviewMode }) {
   const [openFiles, setOpenFiles] = useState([]);
@@ -20,9 +23,14 @@ export default function CollabEditorLayout({ roomId, isInterviewMode }) {
   const { yDoc, provider } = useYjsProvider(roomId);
   const collabEditorRef = useRef();
   const [output, setOutput] = useState("");
-  const [showOutput, setShowOutput] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [isTerminalVisible, setIsTerminalVisible] = useSyncedToggleState("syncodex.footer.terminal.open", true);
+  const [isMoodAssistantOpen, setIsMoodAssistantOpen] = useSyncedToggleState("syncodex.footer.mood.open", true);
+  const [terminalHeight, setTerminalHeight] = useState(240);
+  const [isResizingTerminal, setIsResizingTerminal] = useState(false);
+  const resizeStartYRef = useRef(0);
+  const resizeStartHeightRef = useRef(0);
 
   const fetchRoomDetails = useCallback(async () => {
     if (!provider) return;
@@ -96,7 +104,7 @@ export default function CollabEditorLayout({ roomId, isInterviewMode }) {
     const lang = detectLang(activeFile);
     if (!code || !lang) return;
 
-    setShowOutput(true);
+    setIsTerminalVisible(true);
     setIsRunning(true);
     setOutput("");
 
@@ -110,10 +118,32 @@ export default function CollabEditorLayout({ roomId, isInterviewMode }) {
     }
   };
 
-  const handleCloseOutput = () => {
-    setShowOutput(false);
-    setOutput("");
+  const handleTerminalResizeStart = (event) => {
+    event.preventDefault();
+    resizeStartYRef.current = event.clientY;
+    resizeStartHeightRef.current = terminalHeight;
+    setIsResizingTerminal(true);
   };
+
+  useEffect(() => {
+    if (!isResizingTerminal) return;
+
+    const handleMouseMove = (event) => {
+      const delta = resizeStartYRef.current - event.clientY;
+      const nextHeight = Math.min(420, Math.max(180, resizeStartHeightRef.current + delta));
+      setTerminalHeight(nextHeight);
+    };
+
+    const handleMouseUp = () => setIsResizingTerminal(false);
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizingTerminal]);
 
   return (
     <>
@@ -123,7 +153,9 @@ export default function CollabEditorLayout({ roomId, isInterviewMode }) {
         isHtmlFile={!!isHtmlFile}
       />
 
-      <div className="h-[calc(100vh-4rem)] flex overflow-x-clip bg-[#21232f]">
+      <EmotionMonitor sessionId={roomId} isVisible={isMoodAssistantOpen} />
+
+      <div className="h-[calc(100vh-4rem)] pb-8 flex overflow-x-clip bg-[#21232f]">
         <div
           className={`h-full bg-[#21232f] transition-all duration-300 ease-in-out ${
             isSidebarOpen ? "w-[255px]" : "w-0 overflow-hidden"
@@ -174,9 +206,7 @@ export default function CollabEditorLayout({ roomId, isInterviewMode }) {
 
           <div className="flex h-full overflow-hidden">
             <div
-              className={`pt-3 pb-${
-                showOutput ? "0" : "3"
-              } pr-2 h-full w-full flex flex-col justify-center`}
+              className="pt-3 pr-2 h-full w-full flex flex-col justify-center"
               style={{
                 width: isInterviewMode ? "100%" : "70%",
                 transition: isInterviewMode ? "none" : "width 0.3s ease",
@@ -201,12 +231,24 @@ export default function CollabEditorLayout({ roomId, isInterviewMode }) {
                   </div>
                 )}
               </div>
-              {showOutput && (
-                <CodeExecutionResult
-                  output={output}
-                  isRunning={isRunning}
-                  onClose={handleCloseOutput}
-                />
+
+              {isTerminalVisible && (
+                <>
+                  <div
+                    role="separator"
+                    aria-label="Resize terminal pane"
+                    onMouseDown={handleTerminalResizeStart}
+                    className="mt-2 h-1 cursor-row-resize rounded bg-[#2a2d2e] hover:bg-[#0e639c]"
+                  />
+                  <div style={{ height: `${terminalHeight}px` }} className="mt-2 min-h-0">
+                    <TerminalComponent
+                      projectId={roomId}
+                      output={output}
+                      isRunning={isRunning}
+                      onClose={() => setIsTerminalVisible(false)}
+                    />
+                  </div>
+                </>
               )}
             </div>
 
@@ -227,6 +269,13 @@ export default function CollabEditorLayout({ roomId, isInterviewMode }) {
           </div>
         </div>
       </div>
+
+      <EditorFooterBar
+        isTerminalOpen={isTerminalVisible}
+        isMoodAssistantOpen={isMoodAssistantOpen}
+        onToggleTerminal={() => setIsTerminalVisible((prev) => !prev)}
+        onToggleMoodAssistant={() => setIsMoodAssistantOpen((prev) => !prev)}
+      />
     </>
   );
 }

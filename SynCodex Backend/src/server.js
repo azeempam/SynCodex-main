@@ -11,6 +11,7 @@ import userRoutes from "./routes/userRoutes.js";
 import projectRoutes from "./routes/projectRoutes.js";
 import roomRoutes from "./routes/roomRoutes.js";
 import fileRoutes from "./routes/fileRoutes.js";
+import emotionRoutes from "./routes/emotionRoutes.js";
 import { initializeTerminalHandlers, cleanupAllTerminals } from "./handlers/terminalHandler.js";
 
 dotenv.config();
@@ -33,7 +34,7 @@ app.use(cors({
   origin: "http://localhost:5173",
   credentials: true,
 }));
-app.use(express.json()); 
+app.use(express.json({ limit: "8mb" })); 
 app.use(bodyParser.json());
 
 // API Routes
@@ -43,6 +44,7 @@ app.use("/api/user", userRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/rooms", roomRoutes);
 app.use("/api/files", fileRoutes);
+app.use("/api/emotion", emotionRoutes);
 
 // Root Endpoint (for testing)
 app.get("/", (req, res) => {

@@ -38,12 +38,11 @@ const OpenFolderButton = () => {
     <button
       type="button"
       onClick={handleOpenFolder}
-      className="h-9 inline-flex items-center gap-2 rounded-md border border-[#3f4559] bg-[#2a2f40] px-3 text-xs font-medium text-[#d7deff] hover:bg-[#333a50] hover:border-[#596382] focus:outline-none focus:ring-2 focus:ring-[#4f5d8c] transition-colors"
+      className="p-2 rounded-md cursor-pointer text-slate-300 hover:bg-[rgba(255,255,255,0.1)] transition-colors focus:outline-none focus:ring-0"
       aria-label="Open local folder"
       title="Open local folder"
     >
-      <FolderOpen size={14} className="text-[#9fb1ff]" />
-      <span>Open Folder</span>
+      <FolderOpen size={16} />
     </button>
   );
 };

@@ -172,6 +172,12 @@ const TerminalComponent = ({ projectId, output = '', isRunning = false, onClose 
       resizeObserverRef.current.observe(terminalRef.current);
     }
 
+    const emitTerminalClose = () => {
+      if (sessionIdRef.current && socketRef.current) {
+        socketRef.current.emit('terminal:close', { sessionId: sessionIdRef.current });
+      }
+    };
+
     return () => {
       window.removeEventListener('resize', handleWindowResize);
       if (resizeObserverRef.current) {
@@ -184,9 +190,7 @@ const TerminalComponent = ({ projectId, output = '', isRunning = false, onClose 
       socket.off('connect_error', handleConnectError);
       socket.off('terminal.output', handleTerminalOutput);
 
-      if (sessionIdRef.current) {
-        socket.emit('terminal:kill', { sessionId: sessionIdRef.current });
-      }
+      emitTerminalClose();
 
       socket.disconnect();
 
@@ -195,6 +199,24 @@ const TerminalComponent = ({ projectId, output = '', isRunning = false, onClose 
       setConnectionState('disconnected');
     };
   }, [sessionUserId, projectId]);
+
+  const handleClose = () => {
+    if (sessionIdRef.current && socketRef.current) {
+      socketRef.current.emit('terminal:close', { sessionId: sessionIdRef.current }, () => {
+        sessionIdRef.current = null;
+        setSessionId(null);
+        setConnectionState('disconnected');
+        if (typeof onClose === 'function') {
+          onClose();
+        }
+      });
+      return;
+    }
+
+    if (typeof onClose === 'function') {
+      onClose();
+    }
+  };
 
   useEffect(() => {
     if (!sessionId || !socketRef.current) {
@@ -251,7 +273,7 @@ const TerminalComponent = ({ projectId, output = '', isRunning = false, onClose 
           </button>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="inline-flex items-center gap-1 rounded bg-[#333333] px-2 py-1 text-xs text-gray-200 hover:bg-[#3d3d3d]"
           >
             <X size={14} />

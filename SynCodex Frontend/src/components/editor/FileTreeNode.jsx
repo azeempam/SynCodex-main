@@ -104,7 +104,7 @@ const FileTreeNode = React.memo(
           className={`
             flex items-center gap-1 px-2 py-1 cursor-pointer rounded
             transition-colors duration-150
-            ${isActive ? 'bg-blue-600/40 text-blue-100' : 'hover:bg-gray-700/50'}
+            ${isActive ? 'bg-slate-700/80 text-slate-100' : 'hover:bg-gray-700/50'}
           `}
           style={{ paddingLeft: `${paddingLeft}px` }}
           onClick={handleSelect}

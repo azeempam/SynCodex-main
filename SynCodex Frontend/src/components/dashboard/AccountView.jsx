@@ -330,6 +330,7 @@ export default function AccountView() {
 
                 <div className="flex justify-between mt-4">
                   <button
+                    type="button"
                     onClick={() => {
                       setShowPasswordModal(false);
                       setShowPasswords(false);
