@@ -1,21 +1,14 @@
 import { spawn } from "node-pty";
-import os from "os";
-import path from "path";
 
 /**
- * SECURITY-FIRST Terminal Service
- * Features:
- * - Process isolation per session
- * - Input validation (no command injection)
- * - Configurable shell restrictions
- * - Automatic process cleanup
- * - Size constraints on output
+ * Terminal Session Service
+ * - Spawns a pseudo terminal via node-pty
+ * - Streams output back to socket handler
+ * - Writes raw keystrokes to shell process
  */
 
 const MAX_OUTPUT_BUFFER = 10 * 1024 * 1024; // 10MB max per session
-const ALLOWED_SHELLS = ["/bin/bash", "/bin/sh", "/bin/zsh"];
 const SHELL_TIMEOUT = 30 * 60 * 1000; // 30 minutes max session
-const BLACKLISTED_COMMANDS = ["sudo", "su", "passwd", "exit"];
 
 class TerminalSession {
   constructor(sessionId, userId, workingDir = null) {
@@ -28,35 +21,22 @@ class TerminalSession {
     this.totalOutputSize = 0;
     this.isActive = false;
 
-    // Use project-specific working directory or user home
-    this.workingDir = workingDir || path.join("/tmp/syncodex-sessions", userId);
+    this.workingDir = workingDir;
   }
 
   /**
-   * Security: Validate and sanitize input
-   * Prevents:
-   * - Command injection via shell metacharacters
-   * - Unauthorized command execution
+   * Validate terminal input payload
    */
   validateInput(input) {
     if (!input || typeof input !== "string") {
-      throw new Error("Invalid input");
+      throw new Error("Invalid terminal input");
     }
 
-    const trimmed = input.trim();
-
-    // Reject binary data/control chars (except newline/tab)
-    if (!/^[\x20-\x7E\n\r\t]*$/.test(trimmed)) {
-      throw new Error("Invalid character in input");
+    if (input.length > 8192) {
+      throw new Error("Input too large");
     }
 
-    // Reject dangerous commands
-    const firstCommand = trimmed.split(/\s+/)[0].toLowerCase();
-    if (BLACKLISTED_COMMANDS.includes(firstCommand)) {
-      throw new Error(`Command '${firstCommand}' is not allowed`);
-    }
-
-    return trimmed;
+    return input;
   }
 
   /**
@@ -64,26 +44,15 @@ class TerminalSession {
    */
   async initialize() {
     try {
-      // Determine shell
-      const shell = process.platform === "win32" ? "powershell.exe" : "/bin/bash";
-
-      // Validate shell
-      if (!process.platform === "win32" && !ALLOWED_SHELLS.includes(shell)) {
-        throw new Error("Shell not allowed");
+      if (!this.workingDir) {
+        throw new Error("Working directory is required");
       }
 
-      // Create directory if doesn't exist
-      if (process.platform !== "win32") {
-        const { exec } = await import("child_process");
-        await new Promise((resolve, reject) => {
-          exec(`mkdir -p "${this.workingDir.replace(/"/g, '\\"')}"`, (err) => {
-            if (err) reject(err);
-            else resolve();
-          });
-        });
-      }
+      const isWindows = process.platform === "win32";
+      const shell = isWindows ? "powershell.exe" : "bash";
+      const shellArgs = isWindows ? ["-NoLogo"] : [];
 
-      this.process = spawn(shell, [], {
+      this.process = spawn(shell, shellArgs, {
         name: "xterm-256color",
         cols: 120,
         rows: 40,
@@ -91,7 +60,7 @@ class TerminalSession {
         env: {
           ...process.env,
           TERM: "xterm-256color",
-          SHELL: shell,
+          SHELL: isWindows ? "powershell.exe" : "bash",
         },
       });
 
@@ -118,7 +87,7 @@ class TerminalSession {
   }
 
   /**
-   * Write input to terminal (with validation)
+   * Write keystroke/input to terminal
    */
   write(input) {
     if (!this.isActive || !this.process) {

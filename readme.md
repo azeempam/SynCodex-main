@@ -107,3 +107,8 @@ For support, feedback, or collaboration:
 ## Status
 
 This project is **actively under development**. Features and documentation are subject to frequent updates.
+
+
+
+
+cd '/home/azeem/Documents/Year3 -Sem 2/SynCodex-main/code runner/app' && '/home/azeem/Documents/Year3 -Sem 2/SynCodex-main/.venv/bin/python' app.py

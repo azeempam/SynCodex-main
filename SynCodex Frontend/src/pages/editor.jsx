@@ -1,15 +1,15 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { FileTabs } from "../components/editor/FileTabs";
 import { FileExplorer } from "../components/editor/FileExplorer";
 import { EditorPane } from "../components/editor/EditorPane";
 import EditorNav from "../components/editor/EditorNav";
 import { PanelLeft, PanelRight } from "lucide-react";
 import { runCode } from "../services/codeExec";
-import CodeExecutionResult from "../components/editor/CodeExecutionResult";
 import HtmlPreview from "../components/editor/HtmlPreview";
 import { useParams } from "react-router-dom";
 import API from "../services/api";
 import useMeta from "../hooks/useMeta";
+import TerminalComponent from "../components/terminal/TerminalComponent";
 
 export default function EditorPage() {
   useMeta();
@@ -19,9 +19,13 @@ export default function EditorPage() {
   const [projectName, setProjectName] = useState("Loading...");
   const [code, setCode] = useState("");
   const [output, setOutput] = useState("");
-  const [showOutput, setShowOutput] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [isTerminalVisible, setIsTerminalVisible] = useState(true);
+  const [terminalHeight, setTerminalHeight] = useState(260);
+  const [isResizingTerminal, setIsResizingTerminal] = useState(false);
+  const resizeStartYRef = useRef(0);
+  const resizeStartHeightRef = useRef(0);
 
   const { projectId } = useParams();
 
@@ -72,7 +76,7 @@ export default function EditorPage() {
     if (!code || !activeFile) return;
     const lang = detectLang(activeFile);
     setIsRunning(true);
-    setShowOutput(true);
+    setIsTerminalVisible(true);
     setOutput("");
     try {
       const res = await runCode(lang, code);
@@ -84,10 +88,32 @@ export default function EditorPage() {
     }
   };
 
-  const handleCloseOutput = () => {
-    setShowOutput(false);
-    setOutput("");
+  const handleTerminalResizeStart = (event) => {
+    event.preventDefault();
+    resizeStartYRef.current = event.clientY;
+    resizeStartHeightRef.current = terminalHeight;
+    setIsResizingTerminal(true);
   };
+
+  useEffect(() => {
+    if (!isResizingTerminal) return;
+
+    const handleMouseMove = (event) => {
+      const delta = resizeStartYRef.current - event.clientY;
+      const nextHeight = Math.min(460, Math.max(180, resizeStartHeightRef.current + delta));
+      setTerminalHeight(nextHeight);
+    };
+
+    const handleMouseUp = () => setIsResizingTerminal(false);
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizingTerminal]);
 
   return (
     <>
@@ -143,13 +169,9 @@ export default function EditorPage() {
               setOpenFiles={setOpenFiles}
             />
           </div>
-          <div
-            className={`pt-3 pb-${
-              showOutput ? "0" : "3"
-            } pr-2 h-full w-full flex flex-col justify-center`}
-          >
+          <div className="pt-3 pr-2 h-full w-full min-h-0 flex flex-col">
             <div
-              className={`h-full editor-wrapper flex-1 ${
+              className={`editor-wrapper flex-1 min-h-0 ${
                 isSidebarOpen ? "max-w-[calc(100%-2%)]" : "w-full"
               }`}
             >
@@ -169,12 +191,24 @@ export default function EditorPage() {
                 )}
               </div>
             </div>
-            {showOutput && (
-              <CodeExecutionResult
-                output={output}
-                isRunning={isRunning}
-                onClose={handleCloseOutput}
-              />
+
+            {isTerminalVisible && (
+              <>
+                <div
+                  role="separator"
+                  aria-label="Resize terminal pane"
+                  onMouseDown={handleTerminalResizeStart}
+                  className="mt-2 h-1 cursor-row-resize rounded bg-[#2a2d2e] hover:bg-[#0e639c]"
+                />
+                <div style={{ height: `${terminalHeight}px` }} className="mt-2 min-h-0">
+                  <TerminalComponent
+                    projectId={projectId}
+                    output={output}
+                    isRunning={isRunning}
+                    onClose={() => setIsTerminalVisible(false)}
+                  />
+                </div>
+              </>
             )}
           </div>
         </div>

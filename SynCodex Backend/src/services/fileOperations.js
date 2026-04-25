@@ -101,7 +101,11 @@ async function readFile(projectId, filePath) {
   } catch (error) {
     console.error('Read file error:', error);
     if (error.code === 'ENOENT') {
-      throw new Error('File not found');
+      const projectDir = getProjectDir(projectId);
+      const safePath = getSafePath(projectDir, filePath);
+      await ensureDir(path.dirname(safePath));
+      await fs.writeFile(safePath, '', 'utf8');
+      return { success: true, content: '' };
     }
     throw error;
   }
@@ -115,17 +119,13 @@ async function updateFile(projectId, filePath, content) {
     const projectDir = getProjectDir(projectId);
     const safePath = getSafePath(projectDir, filePath);
 
-    // Verify file exists
-    await fs.stat(safePath);
+    await ensureDir(path.dirname(safePath));
 
     // Write updated content
     await fs.writeFile(safePath, content, 'utf8');
     return { success: true, path: filePath };
   } catch (error) {
     console.error('Update file error:', error);
-    if (error.code === 'ENOENT') {
-      throw new Error('File not found');
-    }
     throw error;
   }
 }

@@ -1,11 +1,13 @@
 import TerminalSession from "../services/terminalService.js";
 import { v4 as uuidv4 } from "uuid";
+import fs from "fs";
+import path from "path";
 
 /**
  * Terminal Socket.io Event Handlers
  * Manages bidirectional streaming between client and terminal process
  * SECURITY:
- * - Input validation prevents command injection
+ * - Input validation prevents malformed terminal payloads
  * - Session timeouts prevent resource exhaustion
  * - Per-user rate limiting prevents abuse
  * - Automatic cleanup on disconnect
@@ -14,12 +16,45 @@ import { v4 as uuidv4 } from "uuid";
 const terminalSessions = new Map();
 const MAX_SESSIONS_PER_USER = 3;
 const SESSION_CHECK_INTERVAL = 60000; // 1 minute
+const TERMINAL_PROJECTS_ROOT = path.resolve(
+  process.env.TERMINAL_PROJECTS_ROOT || path.join(process.cwd(), "terminal-workspaces")
+);
+
+const ensureRootDirectory = () => {
+  if (!fs.existsSync(TERMINAL_PROJECTS_ROOT)) {
+    fs.mkdirSync(TERMINAL_PROJECTS_ROOT, { recursive: true });
+  }
+};
+
+const resolveSafeProjectDirectory = (projectId) => {
+  if (!projectId || typeof projectId !== "string") {
+    throw new Error("projectId is required");
+  }
+
+  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(projectId)) {
+    throw new Error("Invalid projectId");
+  }
+
+  const resolvedProjectDir = path.resolve(TERMINAL_PROJECTS_ROOT, projectId);
+  const isInsideRoot =
+    resolvedProjectDir === TERMINAL_PROJECTS_ROOT ||
+    resolvedProjectDir.startsWith(`${TERMINAL_PROJECTS_ROOT}${path.sep}`);
+
+  if (!isInsideRoot) {
+    throw new Error("Invalid project directory");
+  }
+
+  fs.mkdirSync(resolvedProjectDir, { recursive: true });
+  return resolvedProjectDir;
+};
 
 /**
  * Initialize Terminal Socket Handlers
  * @param {Server} io - Socket.io server instance
  */
 export const initializeTerminalHandlers = (io) => {
+  ensureRootDirectory();
+
   // Cleanup expired sessions every minute
   setInterval(() => {
     for (const [sessionId, session] of terminalSessions) {
@@ -39,9 +74,8 @@ export const initializeTerminalHandlers = (io) => {
      * @event terminal:create
      * @param {string} userId - User identifier
      * @param {string} projectId - Project identifier
-     * @param {string} workingDir - Optional working directory
      */
-    socket.on("terminal:create", ({ userId, projectId, workingDir }, callback) => {
+    socket.on("terminal:create", ({ userId, projectId }, callback) => {
       try {
         // Rate limiting: Max 3 sessions per user
         const userSessions = Array.from(terminalSessions.values()).filter(
@@ -57,14 +91,15 @@ export const initializeTerminalHandlers = (io) => {
 
         // Create new terminal session
         const sessionId = uuidv4();
-        const session = new TerminalSession(sessionId, userId, workingDir);
+        const safeProjectDir = resolveSafeProjectDirectory(projectId);
+        const session = new TerminalSession(sessionId, userId, safeProjectDir);
 
         session.initialize().then(() => {
           terminalSessions.set(sessionId, session);
 
           // Setup data listener
           session.onData((data) => {
-            io.to(socket.id).emit("terminal:output", { sessionId, data });
+            io.to(socket.id).emit("terminal.output", { sessionId, data });
           });
 
           console.log(
@@ -87,12 +122,9 @@ export const initializeTerminalHandlers = (io) => {
     });
 
     /**
-     * Write input to terminal
-     * @event terminal:input
-     * @param {string} sessionId - Terminal session ID
-     * @param {string} input - User input (validated and sanitized)
+     * Required event: terminal.keystroke
      */
-    socket.on("terminal:input", ({ sessionId, input }, callback) => {
+    socket.on("terminal.keystroke", ({ sessionId, keystroke }, callback = () => {}) => {
       try {
         const session = terminalSessions.get(sessionId);
 
@@ -103,14 +135,12 @@ export const initializeTerminalHandlers = (io) => {
           });
         }
 
-        // Validate input (prevents command injection)
-        session.write(input + "\n");
+        session.write(keystroke);
 
         callback({
           success: true,
         });
       } catch (error) {
-        console.error("Terminal input error:", error);
         callback({
           success: false,
           error: error.message,
@@ -125,7 +155,7 @@ export const initializeTerminalHandlers = (io) => {
      * @param {number} cols - Terminal columns
      * @param {number} rows - Terminal rows
      */
-    socket.on("terminal:resize", ({ sessionId, cols, rows }, callback) => {
+    socket.on("terminal:resize", ({ sessionId, cols, rows }, callback = () => {}) => {
       try {
         const session = terminalSessions.get(sessionId);
 
@@ -155,7 +185,7 @@ export const initializeTerminalHandlers = (io) => {
      * @event terminal:stats
      * @param {string} sessionId - Terminal session ID
      */
-    socket.on("terminal:stats", ({ sessionId }, callback) => {
+    socket.on("terminal:stats", ({ sessionId }, callback = () => {}) => {
       try {
         const session = terminalSessions.get(sessionId);
 
@@ -183,7 +213,7 @@ export const initializeTerminalHandlers = (io) => {
      * @event terminal:kill
      * @param {string} sessionId - Terminal session ID
      */
-    socket.on("terminal:kill", ({ sessionId }, callback) => {
+    socket.on("terminal:kill", ({ sessionId }, callback = () => {}) => {
       try {
         const session = terminalSessions.get(sessionId);
 
