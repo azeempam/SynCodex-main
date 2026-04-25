@@ -7,11 +7,9 @@ import crypto from "crypto";
 
 dotenv.config();
 
-const JWT_SECRET = process.env.JWT_SECRET || "default_secret";
-
 // Generate JWT Token
 export const generateToken = (user) => {
-  return jwt.sign({ email: user.email }, JWT_SECRET, { expiresIn: "7d" });
+  return jwt.sign({ email: user.email }, process.env.JWT_SECRET || "default_secret", { expiresIn: "7d" });
 };
 
 // User Registration Function
