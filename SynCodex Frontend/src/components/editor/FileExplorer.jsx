@@ -2,13 +2,9 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   FilePlus,
   FolderPlus,
-  FolderClosed,
-  FolderOpen,
-  File,
   Download,
   Search,
-  MoreVertical,
-  ChevronDown,
+  MoreHorizontal,
 } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import JSZip from "jszip";
@@ -429,7 +425,7 @@ export const FileExplorer = ({
   }, [contextMenu.visible, showMenu, hideContextMenu]);
 
   return (
-    <div className="text-sm border-r border-[#e4e6f3ab] min-w-[255px] max-w-[255px] flex flex-col justify-between h-full bg-[#21232f]">
+    <div className="text-sm border-r border-[#e4e6f3ab] min-w-[255px] max-w-[255px] flex flex-col h-full bg-[#21232f] p-4 gap-3">
       {/* Creation Modal */}
       {creationMode && (
         <div className="fixed inset-0 bg-[#00000093] bg-opacity-50 flex items-center justify-center z-[1000]">
@@ -507,14 +503,94 @@ export const FileExplorer = ({
       )}
 
       {/* Main Content */}
-      <div>
+      <div className="flex flex-col flex-1 min-h-0 gap-3">
         {/* Header */}
-        <div className="sidebar-header px-4 py-2 h-20 overflow-clip text-white text-lg font-semibold flex items-end border-b border-[#e4e6f3ab]">
+        <div className="sidebar-header px-1 py-1 text-slate-400 text-sm font-semibold truncate">
           {sessionName}
         </div>
 
+        {/* Action Bar */}
+        <div className="flex items-center justify-between border-b border-[#e4e6f3ab] pb-3">
+          <div className="flex items-center gap-1">
+            <button
+              className="p-2 rounded-md cursor-pointer text-slate-300 hover:bg-[rgba(255,255,255,0.1)] transition-colors focus:outline-none focus:ring-0"
+              onClick={handleAddFile}
+              title="New File"
+              aria-label="New File"
+              type="button"
+              name="New File"
+            >
+              <FilePlus size={16} />
+            </button>
+
+            <button
+              className="p-2 rounded-md cursor-pointer text-slate-300 hover:bg-[rgba(255,255,255,0.1)] transition-colors focus:outline-none focus:ring-0"
+              onClick={handleAddFolder}
+              title="New Folder"
+              aria-label="New Folder"
+              type="button"
+              name="New Folder"
+            >
+              <FolderPlus size={16} />
+            </button>
+
+            <OpenFolderButton />
+          </div>
+
+          {/* More Actions */}
+          <div className="relative">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowMenu(!showMenu);
+              }}
+              className="p-2 rounded-md cursor-pointer text-slate-300 hover:bg-[rgba(255,255,255,0.1)] transition-colors focus:outline-none focus:ring-0"
+              aria-label="More actions"
+              title="More actions"
+              type="button"
+            >
+              <MoreHorizontal size={16} />
+            </button>
+
+            {showMenu && (
+              <div className="absolute top-10 right-0 bg-[#3D415A] rounded-md shadow-lg border border-gray-600 z-50 min-w-40 overflow-hidden">
+                {!isInterviewMode && (
+                  <button
+                    onClick={() => {
+                      handleDownloadSession();
+                      setShowMenu(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-gray-600 transition-colors inline-flex items-center gap-2"
+                  >
+                    <Download size={14} />
+                    Download
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    expandAll();
+                    setShowMenu(false);
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-gray-600 transition-colors"
+                >
+                  Expand All
+                </button>
+                <button
+                  onClick={() => {
+                    collapseAll();
+                    setShowMenu(false);
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-gray-600 transition-colors border-t border-gray-600"
+                >
+                  Collapse All
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Search Bar */}
-        <div className="px-3 py-2 border-b border-[#e4e6f3ab]">
+        <div className="px-1 pb-2 border-b border-[#e4e6f3ab]">
           <div className="relative">
             <Search
               size={14}
@@ -528,7 +604,7 @@ export const FileExplorer = ({
               className="
                 w-full bg-[#3D415A] text-gray-200 placeholder-gray-500
                 px-3 py-1 pl-7 rounded text-xs
-                outline-none border border-transparent
+                outline-none border border-transparent focus:ring-0
                 hover:border-gray-600 focus:border-blue-500
                 transition-colors
               "
@@ -536,72 +612,8 @@ export const FileExplorer = ({
           </div>
         </div>
 
-        {/* Action Buttons & Menu */}
-        <div className="flex justify-between items-center gap-4 px-3 mb-2 border-b border-[#e4e6f3ab] py-2">
-          <div className="flex gap-2">
-            <button
-              className="p-2 rounded-sm cursor-pointer hover:bg-[#3D415A] transition-colors"
-              onClick={handleAddFile}
-              title="Add File"
-              aria-label="Add File"
-              type="button"
-              name="Add File"
-            >
-              <FilePlus color="white" height={20} />
-            </button>
-            <button
-              className="p-2 rounded-sm cursor-pointer hover:bg-[#3D415A] transition-colors"
-              onClick={handleAddFolder}
-              title="Add Folder"
-              aria-label="Add Folder"
-              type="button"
-              name="Add Folder"
-            >
-              <FolderPlus color="white" height={20} />
-            </button>
-            <OpenFolderButton />
-          </div>
-
-          {/* Menu Button */}
-          <div className="relative">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowMenu(!showMenu);
-              }}
-              className="p-2 rounded-sm cursor-pointer hover:bg-[#3D415A] transition-colors"
-              aria-label="More options"
-            >
-              <MoreVertical size={18} className="text-gray-200" />
-            </button>
-
-            {showMenu && (
-              <div className="absolute top-10 right-0 bg-[#3D415A] rounded shadow-lg border border-gray-600 z-50">
-                <button
-                  onClick={() => {
-                    expandAll();
-                    setShowMenu(false);
-                  }}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 transition-colors"
-                >
-                  Expand All
-                </button>
-                <button
-                  onClick={() => {
-                    collapseAll();
-                    setShowMenu(false);
-                  }}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 transition-colors border-t border-gray-600"
-                >
-                  Collapse All
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
         {/* File Tree */}
-        <div className="space-y-1 flex-1 overflow-y-auto custom-scrollbar max-h-[calc(100vh-270px)] px-2">
+        <div className="space-y-1 flex-1 min-h-0 overflow-y-auto custom-scrollbar px-1">
           {Array.isArray(filteredTree) && filteredTree.length > 0 ? (
             filteredTree.map((node) => (
               <FileTreeNode
@@ -619,21 +631,6 @@ export const FileExplorer = ({
             </div>
           )}
         </div>
-      </div>
-
-      {/* Download Button */}
-      <div
-        className={`px-4 py-2 border-t border-[#e4e6f3ab] flex flex-col gap-2 justify-center items-center`}
-        style={{ visibility: isInterviewMode ? "hidden" : "visible" }}
-      >
-        {!isInterviewMode && (
-          <button
-            onClick={handleDownloadSession}
-            className="p-2 rounded-sm cursor-pointer text-lg font-semibold flex items-center justify-center gap-2 hover:bg-[#3D415A] text-white w-[10rem] transition-colors"
-          >
-            <Download /> Download
-          </button>
-        )}
       </div>
 
       {/* Context Menu - Zustand managed */}

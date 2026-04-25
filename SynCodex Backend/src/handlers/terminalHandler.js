@@ -68,6 +68,7 @@ export const initializeTerminalHandlers = (io) => {
 
   io.on("connection", (socket) => {
     console.log(`✅ Terminal client connected: ${socket.id}`);
+    const socketSessionIds = new Set();
 
     /**
      * Create new terminal session
@@ -96,6 +97,7 @@ export const initializeTerminalHandlers = (io) => {
 
         session.initialize().then(() => {
           terminalSessions.set(sessionId, session);
+          socketSessionIds.add(sessionId);
 
           // Setup data listener
           session.onData((data) => {
@@ -226,6 +228,7 @@ export const initializeTerminalHandlers = (io) => {
 
         session.destroy();
         terminalSessions.delete(sessionId);
+        socketSessionIds.delete(sessionId);
 
         console.log(`🛑 Terminal session destroyed: ${sessionId}`);
 
@@ -242,18 +245,53 @@ export const initializeTerminalHandlers = (io) => {
     });
 
     /**
+     * Close terminal session
+     * @event terminal:close
+     * @param {string} sessionId - Terminal session ID
+     */
+    socket.on("terminal:close", ({ sessionId }, callback = () => {}) => {
+      try {
+        const session = terminalSessions.get(sessionId);
+
+        if (!session) {
+          socketSessionIds.delete(sessionId);
+          return callback({
+            success: true,
+            message: "Session already closed",
+          });
+        }
+
+        session.destroy();
+        terminalSessions.delete(sessionId);
+        socketSessionIds.delete(sessionId);
+
+        console.log(`🛑 Terminal session closed: ${sessionId}`);
+
+        callback({
+          success: true,
+        });
+      } catch (error) {
+        console.error("Terminal close error:", error);
+        callback({
+          success: false,
+          error: error.message,
+        });
+      }
+    });
+
+    /**
      * Handle disconnect - cleanup user sessions
      */
     socket.on("disconnect", () => {
       console.log(`❌ Terminal client disconnected: ${socket.id}`);
-      // Note: Sessions persist on client disconnect for recovery (optional)
-      // Uncomment below to auto-destroy on disconnect:
-      // for (const [sessionId, session] of terminalSessions) {
-      //   if (session.socketId === socket.id) {
-      //     session.destroy();
-      //     terminalSessions.delete(sessionId);
-      //   }
-      // }
+      for (const sessionId of socketSessionIds) {
+        const session = terminalSessions.get(sessionId);
+        if (!session) continue;
+        session.destroy();
+        terminalSessions.delete(sessionId);
+        console.log(`🧹 Disconnected socket cleanup: ${sessionId}`);
+      }
+      socketSessionIds.clear();
     });
 
     /**

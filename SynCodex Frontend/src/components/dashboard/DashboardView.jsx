@@ -5,6 +5,7 @@ import JoinRoomModal from "./JoinRoomModal";
 import axios from "axios";
 import { Trash } from "lucide-react";
 import DeleteRoomProjectModal from "./card_pop_menu/DeleteRoomProjectModal";
+import HealthDashboardCard from "./HealthDashboardCard";
 
 export default function DashboardView() {
   const [roomModalOpen, setRoomModalOpen] = useState(false);
@@ -74,6 +75,8 @@ export default function DashboardView() {
 
   return (
     <div className="bg-[#21232f] text-white p-6">
+      <HealthDashboardCard />
+
       <div className="flex gap-10 mb-6">
         {["Create Room", "Join Room", "Start Coding"].map((text, index) => (
           <div

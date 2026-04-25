@@ -10,6 +10,9 @@ import { useParams } from "react-router-dom";
 import API from "../services/api";
 import useMeta from "../hooks/useMeta";
 import TerminalComponent from "../components/terminal/TerminalComponent";
+import EmotionMonitor from "../components/EmotionMonitor";
+import EditorFooterBar from "../components/editor/EditorFooterBar";
+import useSyncedToggleState from "../hooks/useSyncedToggleState";
 
 export default function EditorPage() {
   useMeta();
@@ -21,7 +24,8 @@ export default function EditorPage() {
   const [output, setOutput] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  const [isTerminalVisible, setIsTerminalVisible] = useState(true);
+  const [isTerminalVisible, setIsTerminalVisible] = useSyncedToggleState("syncodex.footer.terminal.open", true);
+  const [isMoodAssistantOpen, setIsMoodAssistantOpen] = useSyncedToggleState("syncodex.footer.mood.open", true);
   const [terminalHeight, setTerminalHeight] = useState(260);
   const [isResizingTerminal, setIsResizingTerminal] = useState(false);
   const resizeStartYRef = useRef(0);
@@ -123,7 +127,9 @@ export default function EditorPage() {
         isHtmlFile={!!isHtmlFile}
       />
 
-      <div className="h-[calc(100vh-4rem)] flex overflow-x-clip bg-[#21232f]">
+      <EmotionMonitor sessionId={projectId} isVisible={isMoodAssistantOpen} />
+
+      <div className="h-[calc(100vh-4rem)] pb-8 flex overflow-x-clip bg-[#21232f]">
         <div
           className={`h-full bg-[#21232f] transition-all duration-300 ease-in-out ${
             isSidebarOpen ? "w-[255px]" : "w-0 overflow-hidden"
@@ -213,6 +219,13 @@ export default function EditorPage() {
           </div>
         </div>
       </div>
+
+      <EditorFooterBar
+        isTerminalOpen={isTerminalVisible}
+        isMoodAssistantOpen={isMoodAssistantOpen}
+        onToggleTerminal={() => setIsTerminalVisible((prev) => !prev)}
+        onToggleMoodAssistant={() => setIsMoodAssistantOpen((prev) => !prev)}
+      />
     </>
   );
 }
